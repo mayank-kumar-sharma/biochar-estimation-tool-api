@@ -2,7 +2,5 @@ services:
   - type: web
     name: biochar-estimation-api
     env: docker
-    dockerfilePath: ./Dockerfile
     plan: free
     autoDeploy: true
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
