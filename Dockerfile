@@ -4,7 +4,7 @@ FROM python:3.10-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies (if needed by pyproj/shapely)
+# Install system dependencies for pyproj/shapely
 RUN apt-get update && apt-get install -y \
     build-essential \
     libproj-dev \
@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first (for caching)
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade pip and install Python dependencies
+RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 # Copy app code
 COPY . .
@@ -24,5 +24,5 @@ COPY . .
 # Expose the Render port
 EXPOSE $PORT
 
-# Default command (Render overrides with render.yaml if needed)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default command (Render will override if render.yaml is used)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
