@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel
 from shapely.geometry import Polygon
 from pyproj import Geod
@@ -6,7 +6,11 @@ from PIL import Image
 import re
 import io
 
-app = FastAPI(title="Biochar Estimator API", version="1.0")
+app = FastAPI(
+    title="Biochar Estimation API",
+    version="1.0",
+    description="API to estimate biochar yield from direct area, polygon coordinates, or JPEG images."
+)
 
 # --- Static Lookup Tables ---
 FEEDSTOCK_DATA = {
@@ -21,7 +25,7 @@ FEEDSTOCK_DATA = {
 }
 
 COVERAGE_FRACTION = 0.05    # 5% of land covered
-DEFAULT_RESOLUTION = 0.04   # m/pixel
+DEFAULT_RESOLUTION = 0.04   # m/pixel (practical assumption)
 geod = Geod(ellps="WGS84")
 
 # --- Request Schemas ---
@@ -47,7 +51,11 @@ class BiocharResponse(BaseModel):
     application_rate_kg_per_ha: float
 
 
+# --- Core Calculation Function ---
 def calculate(feedstock_type: str, area_m2: float, pile_height: float | None):
+    if feedstock_type not in FEEDSTOCK_DATA:
+        raise HTTPException(status_code=400, detail="Invalid feedstock type")
+
     feedstock_info = FEEDSTOCK_DATA[feedstock_type]
     height_m = pile_height if pile_height else feedstock_info["default_height"]
 
@@ -73,6 +81,12 @@ def calculate(feedstock_type: str, area_m2: float, pile_height: float | None):
     )
 
 
+# --- Endpoints ---
+@app.get("/")
+def health_check():
+    return {"status": "ok", "message": "Biochar Estimation API is running"}
+
+
 @app.post("/estimate/direct", response_model=BiocharResponse)
 def estimate_direct(req: DirectAreaRequest):
     area_m2 = req.hectares * 10000
@@ -82,21 +96,21 @@ def estimate_direct(req: DirectAreaRequest):
 @app.post("/estimate/polygon", response_model=BiocharResponse)
 def estimate_polygon(req: PolygonRequest):
     try:
-        coords = [tuple(map(float, re.split(r"[,\s]+", line.strip()))) 
+        coords = [tuple(map(float, re.split(r"[,\s]+", line.strip())))
                   for line in req.coordinates.strip().split("\n") if line.strip()]
         if len(coords) < 3:
-            return {"error": "At least 3 coordinate points required."}
+            raise HTTPException(status_code=400, detail="At least 3 coordinate points required.")
         lons, lats = zip(*[(lon, lat) for lat, lon in coords])
         area_m2, _ = geod.polygon_area_perimeter(lons, lats)
         area_m2 = abs(area_m2)
     except Exception:
-        return {"error": "Invalid coordinate format. Please use 'lat,lon' per line."}
+        raise HTTPException(status_code=400, detail="Invalid coordinate format. Please use 'lat,lon' per line.")
 
     return calculate(req.feedstock_type, area_m2, req.pile_height)
 
 
 @app.post("/estimate/jpeg", response_model=BiocharResponse)
-async def estimate_jpeg(feedstock_type: str = Form(...), 
+async def estimate_jpeg(feedstock_type: str = Form(...),
                         pile_height: float = Form(None),
                         file: UploadFile = File(...)):
     try:
@@ -105,6 +119,7 @@ async def estimate_jpeg(feedstock_type: str = Form(...),
         width, height = image.size
         area_m2 = (width * DEFAULT_RESOLUTION) * (height * DEFAULT_RESOLUTION)
     except Exception:
-        return {"error": "Invalid JPEG image."}
+        raise HTTPException(status_code=400, detail="Invalid JPEG image.")
 
     return calculate(feedstock_type, area_m2, pile_height)
+
