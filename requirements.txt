@@ -1,5 +1,5 @@
 fastapi==0.110.0
-uvicorn==0.29.0
-shapely==2.0.3
+uvicorn[standard]==0.29.0
+pillow==9.5.0
+shapely==2.0.1
 pyproj==3.6.1
-pydantic==2.6.3
