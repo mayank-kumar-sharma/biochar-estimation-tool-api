@@ -4,7 +4,7 @@ FROM python:3.10-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies (needed for shapely/pyproj)
+# Install system dependencies required for shapely & pyproj
 RUN apt-get update && apt-get install -y \
     build-essential \
     libproj-dev \
@@ -12,19 +12,20 @@ RUN apt-get update && apt-get install -y \
     proj-bin \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first (for caching)
+# Copy requirements first (for caching layers)
 COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app code
+# Copy the rest of the application code
 COPY . .
 
-# Render automatically sets $PORT, we just expose it
+# Render provides $PORT env automatically; expose for documentation
 EXPOSE 8000
 
 # Start FastAPI app with uvicorn
-# Use "exec form" and pass PORT from environment variable
-CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+# IMPORTANT: use "exec form" so signals are passed correctly
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
 
