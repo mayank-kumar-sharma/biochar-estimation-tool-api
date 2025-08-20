@@ -24,8 +24,14 @@ FEEDSTOCK_DATA = {
 }
 
 COVERAGE_FRACTION = 0.05    # 5% of land covered with biomass
-DEFAULT_RESOLUTION = 0.04   # meters per pixel (for JPEG input)
 geod = Geod(ellps="WGS84")
+
+# --- Resolution mapping for JPEG image sources ---
+RESOLUTION_LOOKUP = {
+    "Satellite": 0.04,
+    "Low Drone": 0.06,
+    "High Drone": 0.02
+}
 
 # --- Request Schemas ---
 class DirectAreaRequest(BaseModel):
@@ -96,15 +102,25 @@ def estimate_polygon(req: PolygonRequest):
 
     return calculate(req.feedstock_type, area_m2, req.pile_height)
 
+# --- Updated JPEG Endpoint ---
 @app.post("/estimate/jpeg", response_model=BiocharResponse)
-async def estimate_jpeg(feedstock_type: str = Form(...),
-                        pile_height: float = Form(None),
-                        file: UploadFile = File(...)):
+async def estimate_jpeg(
+    feedstock_type: str = Form(...),
+    pile_height: float = Form(None),
+    image_source: str = Form(...),   # New form field
+    file: UploadFile = File(...)
+):
+    # Validate image source
+    if image_source not in RESOLUTION_LOOKUP:
+        raise HTTPException(status_code=400, detail="Invalid image source. Choose Satellite, Low Drone, or High Drone.")
+
+    resolution = RESOLUTION_LOOKUP[image_source]
+
     try:
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
         width, height = image.size
-        area_m2 = (width * DEFAULT_RESOLUTION) * (height * DEFAULT_RESOLUTION)
+        area_m2 = (width * resolution) * (height * resolution)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JPEG image.")
 
