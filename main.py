@@ -21,6 +21,9 @@ FEEDSTOCK_DATA = {
     "Sugarcane bagasse": {"density": 140, "yield_factor": 0.22, "default_height": 0.2},
     "Groundnut shells": {"density": 130, "yield_factor": 0.26, "default_height": 0.2},
     "Sludge": {"density": 110, "yield_factor": 0.50, "default_height": 0.15},
+    "Cotton stalks": {"density": 150, "yield_factor": 0.27, "default_height": 0.25},
+    "Mustard stalks": {"density": 160, "yield_factor": 0.24, "default_height": 0.25},
+    "Others": {"density": 150, "yield_factor": 0.30, "default_height": 0.25},  # General avg values
 }
 
 COVERAGE_FRACTION = 0.05    # 5% of land covered with biomass
@@ -29,8 +32,8 @@ geod = Geod(ellps="WGS84")
 # --- Resolution mapping for JPEG image sources ---
 RESOLUTION_LOOKUP = {
     "Satellite": 0.04,
-    "Low Drone": 0.06,
-    "High Drone": 0.02
+    "Low Drone (50m altitude)": 0.06,
+    "High Drone (120m altitude)": 0.02
 }
 
 # --- Request Schemas ---
@@ -107,12 +110,12 @@ def estimate_polygon(req: PolygonRequest):
 async def estimate_jpeg(
     feedstock_type: str = Form(...),
     pile_height: float = Form(None),
-    image_source: str = Form(...),   # New form field
+    image_source: str = Form(...),   # Satellite, Low Drone (50m), High Drone (120m)
     file: UploadFile = File(...)
 ):
     # Validate image source
     if image_source not in RESOLUTION_LOOKUP:
-        raise HTTPException(status_code=400, detail="Invalid image source. Choose Satellite, Low Drone, or High Drone.")
+        raise HTTPException(status_code=400, detail="Invalid image source. Choose Satellite, Low Drone (50m altitude), or High Drone (120m altitude).")
 
     resolution = RESOLUTION_LOOKUP[image_source]
 
